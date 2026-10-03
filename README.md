@@ -45,7 +45,40 @@ node new-domains.mjs --watch "login-mybrand"       # typosquat hunting
 node new-domains.mjs --watch mybrand.com --json
 ```
 
-### 3. `nextjs-version.mjs` — exact Next.js version + vuln check
+### 3. `czds-pull.mjs` — new registrations from ICANN CZDS zone files (+ WHOIS/RDAP)
+
+The authoritative complement to CT-log discovery: it catches domains the moment they are
+**registered**, before any TLS certificate exists. It authenticates to ICANN's Centralized
+Zone Data Service, downloads the daily gTLD zone files you're approved for, and **diffs
+today's set of delegated domains against the previous snapshot** — the domains that newly
+appear are new registrations (and ones that vanish are expirations). It can confirm creation
+dates via RDAP (modern WHOIS), and doubles as a one-off WHOIS date checker.
+
+**One-time setup:** create an account at [czds.icann.org](https://czds.icann.org), request
+access to the TLDs you need (approved per registry), then set credentials as env vars:
+
+```bash
+export CZDS_USERNAME=you@example.com
+export CZDS_PASSWORD=…
+# PowerShell: $env:CZDS_USERNAME="you@example.com"; $env:CZDS_PASSWORD="…"
+```
+
+```bash
+node czds-pull.mjs --list                 # zones you're approved for
+node czds-pull.mjs                         # pull all approved zones, diff, list new regs
+node czds-pull.mjs --tld xyz,top           # only these zones
+node czds-pull.mjs --match shop            # only new domains containing a keyword
+node czds-pull.mjs --confirm               # RDAP-confirm creation dates of the new domains
+node czds-pull.mjs --out new-regs.csv      # also write a CSV
+node czds-pull.mjs --whois example.com     # just an RDAP creation-date lookup (no CZDS needed)
+```
+
+Credentials are read **only** from environment variables — never hardcode them. The first
+run on a zone just saves a baseline snapshot (nothing to diff yet); run again on a later day
+to see new registrations. Snapshots are stored under `.czds-state/` (git-ignored). Note that
+some zones (e.g. `.com`) are very large; filter with `--tld` and ensure adequate disk/RAM.
+
+### 4. `nextjs-version.mjs` — exact Next.js version + vuln check
 
 Fingerprints a live site's **exact** Next.js version from its client bundle, then enriches
 it: how far behind the latest npm release it is, and known CVEs for that exact version via
@@ -68,6 +101,9 @@ A Bash equivalent, `nextjs-version.sh`, is included for shell-only environments.
 - **[SSLMate CertSpotter](https://sslmate.com/certspotter/)** — automatic fallback when
   crt.sh is unavailable. It searches a *specific domain* (plus subdomains), so the fallback
   only applies when the keyword is a full domain (e.g. `mybrand.com`).
+- **[ICANN CZDS](https://czds.icann.org)** — daily gTLD zone files (requires a free account
+  and per-TLD approval); the authoritative source for brand-new registrations.
+- **[RDAP](https://rdap.org)** — structured modern WHOIS, for creation/expiration dates.
 - **npm registry** and **OSV.dev** — for the Next.js version/vulnerability enrichment.
 
 The domain tools approximate eTLD+1 with a compact built-in public-suffix set covering the
